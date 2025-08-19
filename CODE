@@ -1,0 +1,118 @@
+import os
+import zipfile
+
+# Define folder structure
+project_root = "sentiment-analysis-project"
+folders = [
+    f"{project_root}/data",
+    f"{project_root}/notebooks",
+    f"{project_root}/scripts"
+]
+
+# Define file contents
+files = {
+    f"{project_root}/scripts/data_collection.py": '''\
+import snscrape.modules.twitter as sntwitter
+import pandas as pd
+
+def scrape_tweets(query, max_tweets=500):
+    tweets = []
+    for i, tweet in enumerate(sntwitter.TwitterSearchScraper(query).get_items()):
+        if i >= max_tweets:
+            break
+        tweets.append([tweet.date, tweet.content])
+    df = pd.DataFrame(tweets, columns=['date', 'text'])
+    df.to_csv('data/sample_data.csv', index=False)
+    return df
+''',
+
+    f"{project_root}/scripts/preprocessing.py": '''\
+import re
+import nltk
+from nltk.corpus import stopwords
+
+nltk.download('stopwords')
+stop_words = set(stopwords.words('english'))
+
+def clean_text(text):
+    text = re.sub(r"http\\S+", "", text)
+    text = re.sub(r"@\\w+", "", text)
+    text = re.sub(r"#\\w+", "", text)
+    text = re.sub(r"[^\\w\\s]", "", text)
+    text = text.lower()
+    text = " ".join([word for word in text.split() if word not in stop_words])
+    return text
+''',
+
+    f"{project_root}/scripts/sentiment.py": '''\
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+
+analyzer = SentimentIntensityAnalyzer()
+
+def get_sentiment_score(text):
+    return analyzer.polarity_scores(text)['compound']
+
+def get_sentiment_label(score):
+    if score >= 0.05:
+        return "Positive"
+    elif score <= -0.05:
+        return "Negative"
+    else:
+        return "Neutral"
+''',
+
+    f"{project_root}/scripts/visualization.py": '''\
+import matplotlib.pyplot as plt
+import seaborn as sns
+from wordcloud import WordCloud
+
+def plot_sentiment_distribution(df):
+    sns.countplot(x='label', data=df)
+    plt.title('Sentiment Distribution')
+    plt.xlabel('Sentiment')
+    plt.ylabel('Count')
+    plt.show()
+
+def plot_sentiment_over_time(df):
+    df['date'] = pd.to_datetime(df['date'])
+    df.set_index('date', inplace=True)
+    df.resample('D')['sentiment'].mean().plot(title='Average Sentiment Over Time')
+    plt.ylabel('Sentiment Score')
+    plt.show()
+
+def generate_wordcloud(df, sentiment_type='Positive'):
+    text = " ".join(df[df['label'] == sentiment_type]['clean_text'])
+    wordcloud = WordCloud(width=800, height=400, background_color='white').generate(text)
+    plt.figure(figsize=(10, 5))
+    plt.imshow(wordcloud, interpolation='bilinear')
+    plt.axis("off")
+    plt.title(f'WordCloud for {sentiment_type} Tweets')
+    plt.show()
+''',
+
+    f"{project_root}/notebooks/sentiment_analysis.ipynb": "",  # Will add next step
+
+    f"{project_root}/requirements.txt": '''\
+pandas
+matplotlib
+seaborn
+nltk
+vaderSentiment
+wordcloud
+snscrape
+''',
+
+    f"{project_root}/README.md": '''\
+# Sentiment Analysis on Social Media Data
+
+This project analyzes public sentiment toward a specific topic using social media data. It performs:
+
+- Data collection from Twitter using `snscrape`
+- Text preprocessing
+- Sentiment analysis using VADER
+- Visualization of trends and word clouds
+
+## Setup
+
+```bash
+pip install -r requirements.txt
